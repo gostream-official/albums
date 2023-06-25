@@ -1,0 +1,23 @@
+# Ignore all files by default, but scan all directories
+*
+!*/
+
+# Exclude git files
+!.git*
+
+# Exclude go module files
+!go.mod
+!go.sum
+
+# Exclude source files
+!*.go
+
+# Exclude markdown files
+!*.md
+
+# Exclude docker files
+![Dd]ockerfile
+
+# Exclude other files
+!*.yml
+!*.yaml

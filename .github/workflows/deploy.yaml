@@ -1,0 +1,112 @@
+# Represents the build pipeline executed whenever a commit is pushed to a development branch.
+name: Deploy
+
+# Execute this pipeline on all branches where active development takes place.
+on:
+  push:
+    branches:
+      # Include main branch.
+      - 'main'
+
+# Environment variable definitions.
+env:
+
+  # The container registry.
+  CONTAINER_REGISTRY: ghcr.io
+
+  # The container image name.
+  CONTAINER_IMAGE_NAME: ${{ github.repository }}
+
+# Run all jobs in bash per default.
+defaults:
+  run:
+    shell: bash
+
+# Defines the jobs included in this pipeline.
+jobs:
+
+  # Job: build
+  build:
+    
+    # Run on ubuntu only.
+    runs-on: ubuntu-latest
+
+    # Grant permissions.
+    permissions:
+      contents: read
+
+    # Job steps.
+    steps:
+
+      # Step 1: checkout the source code.
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Step 2: golang setup.
+      - name: Setup
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+
+      # Step 4: build app.
+      - name: Build
+        run: go build -o bin/albums cmd/main.go
+
+      # Step 5: upload build artifacts. 
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: albums
+          path: bin/
+
+  # Job: docker
+  docker:
+
+    # Run on ubuntu only.
+    runs-on: ubuntu-latest
+
+    # Grant permissions.
+    permissions:
+      contents: read
+      packages: write
+
+    # Job steps.
+    steps:
+
+      # Step 1: checkout the source code.
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Qemu setup
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: linux/amd64,linux/arm/v5,linux/arm/v7,linux/arm64/v8
+
+      - name: Docker buildx setup
+        uses: docker/setup-buildx-action@v2
+
+      # Step 2: login to container registry.
+      - name: Container registry login
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.CONTAINER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 3: extract docker metadata.
+      - name: Extract metadata for docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.CONTAINER_REGISTRY }}/${{ env.CONTAINER_IMAGE_NAME }}
+          tags: latest
+
+      # Step 4: build and push docker image.
+      - name: Build and push docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm/v5,linux/arm/v7,linux/arm64/v8

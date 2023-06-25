@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+
+  albums:
+    build: .
+    container_name: albums
+    environment:
+      MONGO_USERNAME: root
+      MONGO_PASSWORD: example
+      MONGO_HOST: mongo:27017
+    ports:
+      - "9871:9871"
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    ports:
+      - 27017:27017
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: example
