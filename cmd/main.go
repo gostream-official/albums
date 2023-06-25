@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/gostream-official/albums/impl/funcs/createalbum"
 	"github.com/gostream-official/albums/impl/funcs/deletealbum"
@@ -30,6 +31,17 @@ func init() {
 //	Represents the entry point of the application.
 func main() {
 	log.Infof("booting service instance ...")
+
+	executionPortEnvVar := env.GetEnvironmentVariableWithFallback("PORT", "9871")
+	executionPort, err := strconv.Atoi(executionPortEnvVar)
+
+	if err != nil {
+		log.Fatalf("Received invalid execution port")
+	}
+
+	if executionPort < 0 || executionPort > 65535 {
+		log.Fatalf("Received invalid execution port")
+	}
 
 	mongoUsername, err := env.GetEnvironmentVariable("MONGO_USERNAME")
 	if err != nil {
@@ -66,7 +78,7 @@ func main() {
 	engine.HandleWith("PUT", "/albums/:id", updatealbum.Handler).Inject(injector)
 	engine.HandleWith("DELETE", "/albums/:id", deletealbum.Handler).Inject(injector)
 
-	err = engine.Run(9871)
+	err = engine.Run(uint16(executionPort))
 	if err != nil {
 		log.Fatalf("failed to launch router engine: %s", err)
 	}
