@@ -25,5 +25,5 @@ type AlbumInfo struct {
 type AlbumStats struct {
 
 	// The popularity factor.
-	Popularity float32 `json:"popularity" bson:"popularity"`
+	Popularity float32 `json:"popularity" bson:"popularity,truncate"`
 }

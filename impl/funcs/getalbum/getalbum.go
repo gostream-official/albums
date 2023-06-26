@@ -62,7 +62,7 @@ func Handler(request *api.APIRequest, object interface{}) *api.APIResponse {
 		}
 	}
 
-	store := store.NewMongoStore[models.TrackInfo](injector.MongoInstance, "gostream", "albums")
+	store := store.NewMongoStore[models.AlbumInfo](injector.MongoInstance, "gostream", "albums")
 
 	filter := query.Filter{
 		Root: query.FilterOperatorEq{

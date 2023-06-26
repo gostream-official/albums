@@ -8,6 +8,7 @@ import (
 	"github.com/gostream-official/albums/impl/funcs/deletealbum"
 	"github.com/gostream-official/albums/impl/funcs/getalbum"
 	"github.com/gostream-official/albums/impl/funcs/getalbums"
+	"github.com/gostream-official/albums/impl/funcs/getalbumtracks"
 	"github.com/gostream-official/albums/impl/funcs/updatealbum"
 	"github.com/gostream-official/albums/impl/inject"
 	"github.com/gostream-official/albums/pkg/env"
@@ -74,6 +75,7 @@ func main() {
 
 	engine.HandleWith("GET", "/albums", getalbums.Handler).Inject(injector)
 	engine.HandleWith("GET", "/albums/:id", getalbum.Handler).Inject(injector)
+	engine.HandleWith("GET", "/albums/:id/tracks", getalbumtracks.Handler).Inject(injector)
 	engine.HandleWith("POST", "/albums", createalbum.Handler).Inject(injector)
 	engine.HandleWith("PUT", "/albums/:id", updatealbum.Handler).Inject(injector)
 	engine.HandleWith("DELETE", "/albums/:id", deletealbum.Handler).Inject(injector)

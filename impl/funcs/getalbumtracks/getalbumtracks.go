@@ -1,9 +1,8 @@
-package getalbums
+package getalbumtracks
 
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gostream-official/albums/impl/inject"
 	"github.com/gostream-official/albums/impl/models"
@@ -31,7 +30,7 @@ func GetSafeInjector(object interface{}) (*inject.Injector, error) {
 	injector, ok := object.(inject.Injector)
 
 	if !ok {
-		return nil, fmt.Errorf("getalbums: failed to deduce injector")
+		return nil, fmt.Errorf("getalbumtracks: failed to deduce injector")
 	}
 
 	return &injector, nil
@@ -39,44 +38,47 @@ func GetSafeInjector(object interface{}) (*inject.Injector, error) {
 
 // Description:
 //
-//	Creates a query filter from the incoming API request.
+//	Finds all tracks contained in an album.
 //
 // Parameters:
 //
-//	request The incoming API request.
+//	store The track store.
+//	album The album to search.
 //
 // Returns:
 //
-//	The created query filter.
-func CreateFilterFromQueryParameters(request *api.APIRequest) query.Filter {
-	andFilter := query.FilterOperatorAnd{
-		And: make([]query.IQuery, 0),
+//	All tracks contained in the given album.
+//	An error if the database query fails.
+func FindTracksForAlbum(store *store.MongoStore[models.TrackInfo], album *models.AlbumInfo) ([]models.TrackInfo, error) {
+	filter := query.Filter{}
+
+	filters := make([]query.IQuery, 0)
+	for _, trackID := range album.TrackIDs {
+		eq := query.FilterOperatorEq{
+			Key:   "_id",
+			Value: trackID,
+		}
+
+		filters = append(filters, eq)
 	}
 
-	var realLimit int
-	var realLimitErr error
-
-	limit, limitOk := request.QueryParameters["limit"]
-	if limitOk {
-		realLimit, realLimitErr = strconv.Atoi(limit)
+	or := query.FilterOperatorOr{
+		Or: filters,
 	}
 
-	resultFilter := query.Filter{}
+	filter.Root = or
 
-	if limitOk && realLimitErr == nil {
-		resultFilter.Limit = uint32(realLimit)
+	tracks, err := store.FindItems(&filter)
+	if err != nil {
+		return nil, err
 	}
 
-	if len(andFilter.And) > 0 {
-		resultFilter.Root = andFilter
-	}
-
-	return resultFilter
+	return tracks, nil
 }
 
 // Description:
 //
-//	The router handler for: Get Track By ID
+//	The router handler for getting all tracks in an album.
 //
 // Parameters:
 //
@@ -100,10 +102,18 @@ func Handler(request *api.APIRequest, object interface{}) *api.APIResponse {
 		}
 	}
 
-	store := store.NewMongoStore[models.AlbumInfo](injector.MongoInstance, "gostream", "albums")
-	filter := CreateFilterFromQueryParameters(request)
+	albumStore := store.NewMongoStore[models.AlbumInfo](injector.MongoInstance, "gostream", "albums")
+	trackStore := store.NewMongoStore[models.TrackInfo](injector.MongoInstance, "gostream", "tracks")
 
-	items, err := store.FindItems(&filter)
+	filter := query.Filter{
+		Root: query.FilterOperatorEq{
+			Key:   "_id",
+			Value: request.PathParameters["id"],
+		},
+		Limit: 10,
+	}
+
+	items, err := albumStore.FindItems(&filter)
 
 	if err != nil {
 		log.Errorf("[%s] failed to retrieve database items: %s", context.ID, err)
@@ -112,8 +122,31 @@ func Handler(request *api.APIRequest, object interface{}) *api.APIResponse {
 		}
 	}
 
+	if len(items) == 0 {
+		return &api.APIResponse{
+			StatusCode: http.StatusNotFound,
+		}
+	}
+
+	resultItem := items[0]
+	if len(resultItem.TrackIDs) == 0 {
+		log.Warnf("[%s] album does not contain tracks", context.ID)
+		return &api.APIResponse{
+			StatusCode: http.StatusOK,
+			Body:       []models.TrackInfo{},
+		}
+	}
+
+	tracks, err := FindTracksForAlbum(trackStore, &resultItem)
+	if err != nil {
+		log.Errorf("[%s] failed to find album tracks: %s", context.ID, err)
+		return &api.APIResponse{
+			StatusCode: http.StatusInternalServerError,
+		}
+	}
+
 	return &api.APIResponse{
 		StatusCode: http.StatusOK,
-		Body:       items,
+		Body:       tracks,
 	}
 }
